@@ -17,7 +17,7 @@ import { Employee } from '../../models/employee.model';
   standalone: false,
 })
 export class EmployeeComponent implements OnChanges {
-  @Output() employeeAdded = new EventEmitter<void>();
+  @Output() employeeAdded = new EventEmitter<Employee>();
   @Input() employeeToEdit: Employee | null = null;
   @Input() editIndex: number | null = null;
 
@@ -54,14 +54,8 @@ export class EmployeeComponent implements OnChanges {
     if (this.employeeForm.valid) {
       const employee: Employee = this.employeeForm.value;
 
-      if (this.isEditMode && this.editIndex !== null) {
-        this.employeeService.updateEmployee(this.editIndex, employee);
-      } else {
-        this.employeeService.addEmployee(employee);
-      }
-
+      this.employeeAdded.emit(employee);
       this.resetForm();
-      this.employeeAdded.emit();
       (document.getElementById('closeModalBtn') as HTMLElement).click();
     }
   }

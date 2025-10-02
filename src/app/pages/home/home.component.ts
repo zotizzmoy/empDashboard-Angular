@@ -5,7 +5,7 @@ import { Employee } from '../../models/employee.model';
 @Component({
   selector: 'app-home',
   templateUrl: './home.component.html',
-  styleUrls: ['./home.component.css'], // ✅ fixed typo (styleUrls not styleUrl)
+  styleUrls: ['./home.component.css'],
   standalone: false,
 })
 export class HomeComponent implements OnInit {
@@ -17,18 +17,22 @@ export class HomeComponent implements OnInit {
   searchTerm: string = '';
   selectedDepartment: string = 'All Departments';
 
+  // Sorting
+  sortColumn: string = '';
+  sortDirection: 'asc' | 'desc' = 'asc';
+
   constructor(private employeeService: EmployeeService) {}
 
   ngOnInit(): void {
     this.loadEmployees();
   }
 
-  loadEmployees() {
+  loadEmployees(): void {
     this.employees = this.employeeService.getEmployees();
     this.applyFilters();
   }
 
-  applyFilters() {
+  applyFilters(): void {
     let result = [...this.employees];
 
     // Search filter
@@ -48,46 +52,74 @@ export class HomeComponent implements OnInit {
       );
     }
 
+    // Sorting
+    if (this.sortColumn) {
+      result.sort((a, b) => {
+        let valA: any;
+        let valB: any;
+
+        if (this.sortColumn === 'name') {
+          valA = a.name.toLowerCase();
+          valB = b.name.toLowerCase();
+        } else if (this.sortColumn === 'dateOfJoining') {
+          valA = new Date(a.dateOfJoining).getTime();
+          valB = new Date(b.dateOfJoining).getTime();
+        }
+
+        if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
     this.filteredEmployees = result;
   }
 
-  onEmployeeAdded() {
-    this.loadEmployees();
-    this.employeeToEdit = null;
-    this.editIndex = null;
-  }
-
-  editEmployee(employee: Employee) {
-    // Find index in original employees array
-    const actualIndex = this.employees.findIndex(
-      (emp) => emp.id === employee.id
-    );
-
+  editEmployee(employee: Employee): void {
     this.employeeToEdit = { ...employee };
-    this.editIndex = actualIndex;
+    this.editIndex = this.employees.indexOf(employee);
   }
 
-  removeEmployee(employee: Employee) {
+  removeEmployee(employee: Employee): void {
     if (confirm('Are you sure you want to delete this employee?')) {
-      const actualIndex = this.employees.findIndex(
-        (emp) => emp.id === employee.id
-      );
-
-      if (actualIndex !== -1) {
-        this.employeeService.deleteEmployee(actualIndex);
-        this.loadEmployees();
+      const index = this.employees.indexOf(employee);
+      if (index !== -1) {
+        this.employeeService.deleteEmployee(index);
+        this.employees.splice(index, 1); // Update local array
+        this.applyFilters();
       }
     }
   }
 
-  exportCsv() {
-    if (!this.filteredEmployees.length) {
-      alert('No data to export!');
-      return;
+  onEmployeeAdded(employee: Employee): void {
+    if (this.editIndex !== null && this.employeeToEdit) {
+      this.employeeService.updateEmployee(this.editIndex, employee);
+    } else {
+      this.employeeService.addEmployee(employee);
     }
 
-    // Build CSV header
-    const header = ['Name', 'Department', 'Email', 'Date of Joining'];
+    this.employees = this.employeeService.getEmployees();
+
+    this.applyFilters();
+
+    this.employeeToEdit = null;
+    this.editIndex = null;
+  }
+
+  // Sorting toggle
+  sortBy(column: 'name' | 'dateOfJoining'): void {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+    this.applyFilters();
+  }
+
+  // Export CSV
+  exportCSV(): void {
+    const headers = ['Name', 'Department', 'Email', 'Date of Joining'];
     const rows = this.filteredEmployees.map((emp) => [
       emp.name,
       emp.department,
@@ -95,16 +127,13 @@ export class HomeComponent implements OnInit {
       new Date(emp.dateOfJoining).toLocaleDateString(),
     ]);
 
-    // Convert to CSV string
-    const csvContent = [header, ...rows]
-      .map((e) => e.map((field) => `"${field}"`).join(','))
-      .join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers, ...rows].map((e) => e.join(',')).join('\n');
 
-    // Download as file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
+    const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
-    link.setAttribute('href', url);
+    link.setAttribute('href', encodedUri);
     link.setAttribute('download', 'employees.csv');
     document.body.appendChild(link);
     link.click();
