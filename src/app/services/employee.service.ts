@@ -1,47 +1,63 @@
-
+// employee.service.ts
 import { Injectable } from '@angular/core';
 import { Employee } from '../models/employee.model';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class EmployeeService {
-  private storageKey = 'employees';
+  private employees: Employee[] = [];
+  private readonly STORAGE_KEY = 'employees_data';
 
-  constructor() {}
-
-  private getEmployeesFromStorage(): Employee[] {
-    const data = localStorage.getItem(this.storageKey);
-    return data ? JSON.parse(data) : [];
+  constructor() {
+    this.loadFromStorage();
   }
 
-  private saveEmployeesToStorage(employees: Employee[]): void {
-    localStorage.setItem(this.storageKey, JSON.stringify(employees));
+  private loadFromStorage(): void {
+    const data = localStorage.getItem(this.STORAGE_KEY);
+    if (data) {
+      try {
+        this.employees = JSON.parse(data);
+      } catch (error) {
+        console.error('Error loading employees from localStorage:', error);
+        this.employees = [];
+      }
+    }
+  }
+
+  private saveToStorage(): void {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.employees));
+    } catch (error) {
+      console.error('Error saving employees to localStorage:', error);
+    }
   }
 
   getEmployees(): Employee[] {
-    return this.getEmployeesFromStorage();
+    return this.employees;
   }
 
   addEmployee(employee: Employee): void {
-    const employees = this.getEmployeesFromStorage();
-    employee.id = new Date().getTime(); // unique ID
-    employees.push(employee);
-    this.saveEmployeesToStorage(employees);
+    this.employees.push(employee);
+    this.saveToStorage();
   }
 
-  updateEmployee(updated: Employee): void {
-    let employees = this.getEmployeesFromStorage();
-    employees = employees.map(emp => emp.id === updated.id ? updated : emp);
-    this.saveEmployeesToStorage(employees);
+  updateEmployee(index: number, employee: Employee): void {
+    if (index >= 0 && index < this.employees.length) {
+      this.employees[index] = employee;
+      this.saveToStorage();
+    }
   }
 
-  deleteEmployee(id: number): void {
-    const employees = this.getEmployeesFromStorage().filter(emp => emp.id !== id);
-    this.saveEmployeesToStorage(employees);
+  deleteEmployee(index: number): void {
+    if (index >= 0 && index < this.employees.length) {
+      this.employees.splice(index, 1);
+      this.saveToStorage();
+    }
   }
 
-  getEmployeeById(id: number): Employee | undefined {
-    return this.getEmployeesFromStorage().find(emp => emp.id === id);
+  clearAllEmployees(): void {
+    this.employees = [];
+    localStorage.removeItem(this.STORAGE_KEY);
   }
 }
